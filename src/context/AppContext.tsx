@@ -66,6 +66,7 @@ import {
 import { handleSettingsChatCommand } from '../lib/settingsChatHandler';
 import { evaluateSettingsCommand } from '../lib/chatCapabilityManifest';
 import { evaluateInterfaceCaptureChatCommand } from '../lib/interfaceCaptureChatHandler';
+import { evaluateChatCommand } from '../lib/commandRouter';
 import {
   AVAILABLE_AI_MODELS,
   DEFAULT_AI_ACCOUNTS,
@@ -101,7 +102,6 @@ import {
 } from '../lib/projectTimeline';
 import { fileIntelligence } from '../lib/fileIntelligence';
 import { formatChatCodeResponse } from '../utils/chatCodeFormatter';
-import { animationCoordinator } from '../lib/rendering';
 
 interface ConfirmationConfig {
   isOpen: boolean;
@@ -316,12 +316,6 @@ interface AppContextType {
 
   // Live thinking status
   liveThinkingStatus: string | null;
-
-  // Animation System Controls
-  viewerAnimationEnabled: boolean;
-  setViewerAnimationEnabled: (enabled: boolean) => void;
-  backgroundAnimationEnabled: boolean;
-  setBackgroundAnimationEnabled: (enabled: boolean) => void;
 }
 
 const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
@@ -329,8 +323,6 @@ const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {
   deleteConfirmationTimerEnabled: true,
   userReadingSpeedWpm: 200,
   aiCallMode: 'single',
-  viewerAnimationEnabled: true,
-  backgroundAnimationEnabled: true,
 };
 
 const DEFAULT_SAVED_SCRIPTS: SavedScript[] = [
@@ -782,58 +774,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(false);
 
-  // Viewer & Background Animation System States
-  const [viewerAnimationEnabled, setViewerAnimationEnabledState] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed: AppStateData = JSON.parse(saved);
-        if (parsed.settings?.viewerAnimationEnabled !== undefined) {
-          return parsed.settings.viewerAnimationEnabled;
-        }
-        if (parsed.settings?.generalSettings?.viewerAnimationEnabled !== undefined) {
-          return parsed.settings.generalSettings.viewerAnimationEnabled;
-        }
-      }
-    } catch (e) {}
-    return true;
-  });
-
-  const [backgroundAnimationEnabled, setBackgroundAnimationEnabledState] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed: AppStateData = JSON.parse(saved);
-        if (parsed.settings?.backgroundAnimationEnabled !== undefined) {
-          return parsed.settings.backgroundAnimationEnabled;
-        }
-        if (parsed.settings?.generalSettings?.backgroundAnimationEnabled !== undefined) {
-          return parsed.settings.generalSettings.backgroundAnimationEnabled;
-        }
-      }
-    } catch (e) {}
-    return true;
-  });
-
-  // Sync to central animationCoordinator on initial mount and update
-  useEffect(() => {
-    animationCoordinator.setViewerAnimationEnabled(viewerAnimationEnabled);
-  }, []);
-
-  useEffect(() => {
-    animationCoordinator.setBackgroundAnimationEnabled(backgroundAnimationEnabled);
-  }, []);
-
-  const setViewerAnimationEnabled = useCallback((enabled: boolean) => {
-    setViewerAnimationEnabledState(enabled);
-    animationCoordinator.setViewerAnimationEnabled(enabled);
-  }, []);
-
-  const setBackgroundAnimationEnabled = useCallback((enabled: boolean) => {
-    setBackgroundAnimationEnabledState(enabled);
-    animationCoordinator.setBackgroundAnimationEnabled(enabled);
-  }, []);
-
   // General Settings
   const [generalSettings, setGeneralSettings] = useState<GeneralSettings>(() => {
     try {
@@ -852,14 +792,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   });
 
   const updateGeneralSettings = useCallback((updates: Partial<GeneralSettings>) => {
-    if (updates.viewerAnimationEnabled !== undefined) {
-      setViewerAnimationEnabled(updates.viewerAnimationEnabled);
-    }
-    if (updates.backgroundAnimationEnabled !== undefined) {
-      setBackgroundAnimationEnabled(updates.backgroundAnimationEnabled);
-    }
     setGeneralSettings((prev) => ({ ...prev, ...updates }));
-  }, [setViewerAnimationEnabled, setBackgroundAnimationEnabled]);
+  }, []);
 
   // Multi-AI Model & Account State
   const [aiAccounts, setAiAccounts] = useState<AIAccount[]>(() => {
@@ -1784,8 +1718,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           activeProjectId,
           storageBudget,
           generalSettings,
-          viewerAnimationEnabled,
-          backgroundAnimationEnabled,
         },
         projects,
         projectActivities,
@@ -1822,8 +1754,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     automationRules,
     runCodeEntries,
     generalSettings,
-    viewerAnimationEnabled,
-    backgroundAnimationEnabled,
   ]);
 
   // Central Navigation & History Handlers
@@ -2397,8 +2327,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.warn('AXON Brain processing error (gracefully proceeding to standard chat dispatch):', brainErr);
     }
 
-    // 0. Check for custom command Run Code entries (e.g. /status)
+    // 0. Check AXON Command Router (e.g. /open <target>, navigation commands)
     const trimmedInput = (typeof text === 'string' ? text : '').trim();
+    const commandResult = evaluateChatCommand(
+      trimmedInput,
+      { navigateTo },
+      currentScreen
+    );
+
+    if (commandResult.handled) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `msg-${Date.now()}-cmd`,
+          sender: 'axon',
+          text: commandResult.response,
+          projectId: activeProjectId,
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          modelUsed: commandResult.executed
+            ? 'AXON Command Router'
+            : 'AXON Command Router (Notice)',
+        },
+      ]);
+      return;
+    }
+
+    // 0.5. Check for custom command Run Code entries (e.g. /status)
     const activeCommand = runCodeEntries.find(
       (e) => e.enabled && e.hookPoint === 'custom_command' && e.commandKeyword && trimmedInput.startsWith(e.commandKeyword)
     );
@@ -3478,8 +3432,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeProjectId,
         storageBudget,
         generalSettings,
-        viewerAnimationEnabled,
-        backgroundAnimationEnabled,
       },
       projects,
       projectActivities,
@@ -3518,12 +3470,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         if (parsed.settings.generalSettings) {
           setGeneralSettings({ ...DEFAULT_GENERAL_SETTINGS, ...parsed.settings.generalSettings });
-        }
-        if (parsed.settings.viewerAnimationEnabled !== undefined) {
-          setViewerAnimationEnabled(parsed.settings.viewerAnimationEnabled);
-        }
-        if (parsed.settings.backgroundAnimationEnabled !== undefined) {
-          setBackgroundAnimationEnabled(parsed.settings.backgroundAnimationEnabled);
         }
         if (parsed.settings.codeSkillLevel) {
           setCodeSkillLevel(parsed.settings.codeSkillLevel);
@@ -3604,8 +3550,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAssetManifest(DEFAULT_ASSET_MANIFEST);
         setStorageBudget(DEFAULT_STORAGE_BUDGET_CONFIG);
         setGeneralSettings(DEFAULT_GENERAL_SETTINGS);
-        setViewerAnimationEnabled(true);
-        setBackgroundAnimationEnabled(true);
         closeConfirmation();
         showToast('AXON reset to factory defaults');
       },
@@ -3741,10 +3685,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         resetAllData,
         generalSettings,
         updateGeneralSettings,
-        viewerAnimationEnabled,
-        setViewerAnimationEnabled,
-        backgroundAnimationEnabled,
-        setBackgroundAnimationEnabled,
         toastMessage,
         showToast,
         isMenuOpen,

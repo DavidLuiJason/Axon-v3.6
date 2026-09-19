@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useMemo } from 'react';
-import { useApp } from './AppContext';
 
 export type AnimationScope = 'viewer' | 'background';
 
@@ -8,17 +7,9 @@ export interface AnimationPolicyState {
   scope: AnimationScope;
   /** Whether animations are currently enabled for this active scope */
   isEnabled: boolean;
-  /** Value of the user-facing Viewer Animation setting */
-  viewerAnimationEnabled: boolean;
-  /** Value of the Background Animation setting */
-  backgroundAnimationEnabled: boolean;
-  /** Persistently update viewer animation setting */
-  setViewerAnimationEnabled: (enabled: boolean) => void;
-  /** Persistently update background animation setting */
-  setBackgroundAnimationEnabled: (enabled: boolean) => void;
-  /** Return CSS transition string if enabled, or fallback (e.g. 'none') */
+  /** Return CSS transition string */
   getTransitionStyle: (standardTransition: string, fallbackTransition?: string) => string;
-  /** Return standard animation duration in ms if enabled, or 0 ms if disabled */
+  /** Return standard animation duration in ms */
   getDurationMs: (standardDurationMs: number) => number;
 }
 
@@ -45,36 +36,23 @@ export const AnimationScopeProvider: React.FC<AnimationScopeProviderProps> = ({
 };
 
 /**
- * Authoritative hook for querying and controlling the independent animation policies.
+ * Authoritative hook for querying animation policies.
+ * AXON's UI motion is permanently enabled as part of the interface.
  */
 export const useAnimationPolicy = (): AnimationPolicyState => {
   const scope = useContext(AnimationScopeContext);
-  const { generalSettings, updateGeneralSettings } = useApp();
-
-  const viewerAnimationEnabled = generalSettings.viewerAnimationEnabled !== false;
-  const backgroundAnimationEnabled = generalSettings.backgroundAnimationEnabled === true;
-
-  const isEnabled = scope === 'viewer' ? viewerAnimationEnabled : backgroundAnimationEnabled;
 
   return useMemo(
     () => ({
       scope,
-      isEnabled,
-      viewerAnimationEnabled,
-      backgroundAnimationEnabled,
-      setViewerAnimationEnabled: (enabled: boolean) => {
-        updateGeneralSettings({ viewerAnimationEnabled: enabled });
-      },
-      setBackgroundAnimationEnabled: (enabled: boolean) => {
-        updateGeneralSettings({ backgroundAnimationEnabled: enabled });
-      },
-      getTransitionStyle: (standardTransition: string, fallbackTransition: string = 'none') => {
-        return isEnabled ? standardTransition : fallbackTransition;
+      isEnabled: true,
+      getTransitionStyle: (standardTransition: string) => {
+        return standardTransition;
       },
       getDurationMs: (standardDurationMs: number) => {
-        return isEnabled ? standardDurationMs : 0;
+        return standardDurationMs;
       },
     }),
-    [scope, isEnabled, viewerAnimationEnabled, backgroundAnimationEnabled, updateGeneralSettings]
+    [scope]
   );
 };

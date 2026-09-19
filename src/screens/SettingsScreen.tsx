@@ -74,10 +74,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ initialTab }) =>
     storageBudget,
     showToast,
     activePanelPayload,
-    viewerAnimationEnabled,
-    setViewerAnimationEnabled,
-    backgroundAnimationEnabled,
-    setBackgroundAnimationEnabled,
   } = useApp();
 
   const [activeTab, setActiveTab] = useState<'ai' | 'appearance' | 'system'>(() =>
@@ -335,69 +331,6 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({ initialTab }) =>
                       )}
                     </button>
                   ))}
-                </div>
-              </div>
-            </div>
-
-            {/* SECTION: Animation & Motion Foundation Controls */}
-            <div id="section-animation-controls" className="rounded-2xl bg-neutral-900/40 border border-neutral-800/80 p-5 space-y-4">
-              <div className="flex items-center gap-2.5">
-                <Sparkles className="w-4 h-4 text-neutral-300" />
-                <div>
-                  <h3 className="text-sm font-semibold text-white">Motion & Animation</h3>
-                  <p className="text-xs text-neutral-400">
-                    System controls for interactive rendering and low-power background visual workloads
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-2.5 pt-1">
-                {/* 1. Viewer Animation Toggle */}
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800/70">
-                  <div className="space-y-0.5 pr-4">
-                    <p className="text-xs font-semibold text-white">Viewer Animation</p>
-                    <p className="text-[11px] text-neutral-400 leading-relaxed">
-                      Interactive viewport transitions, layer fades, timeline scrubber, and zoom effects
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                    <input
-                      id="toggle-viewer-animation"
-                      type="checkbox"
-                      checked={viewerAnimationEnabled}
-                      onChange={(e) => {
-                        const nextVal = e.target.checked;
-                        setViewerAnimationEnabled(nextVal);
-                        showToast(nextVal ? 'Viewer animation enabled' : 'Viewer animation suspended');
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-white"></div>
-                  </label>
-                </div>
-
-                {/* 2. Background Animation Toggle */}
-                <div className="flex items-center justify-between p-3.5 rounded-xl bg-neutral-950/60 border border-neutral-800/70">
-                  <div className="space-y-0.5 pr-4">
-                    <p className="text-xs font-semibold text-white">Background Animation</p>
-                    <p className="text-[11px] text-neutral-400 leading-relaxed">
-                      Ambient visual pulses, idle rendering, and low-priority decorative background effects
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                    <input
-                      id="toggle-background-animation"
-                      type="checkbox"
-                      checked={backgroundAnimationEnabled}
-                      onChange={(e) => {
-                        const nextVal = e.target.checked;
-                        setBackgroundAnimationEnabled(nextVal);
-                        showToast(nextVal ? 'Background animation enabled' : 'Background animation suspended');
-                      }}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-neutral-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-white"></div>
-                  </label>
                 </div>
               </div>
             </div>
