@@ -70,6 +70,14 @@ export interface WorkspaceSnippetHistoryItem {
   byteSize?: number;
 }
 
+export interface ChatCommandOption {
+  label: string;
+  actionText: string;
+  destinationId?: string;
+  description?: string;
+  category?: string;
+}
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'axon';
@@ -86,6 +94,7 @@ export interface ChatMessage {
   showFullCodeInChat?: boolean;
   attachment?: ChatAttachment;
   attachments?: ChatAttachment[];
+  commandOptions?: ChatCommandOption[];
 }
 
 export interface QueuedTask {

@@ -164,6 +164,30 @@ export const AXON_INTERFACES: InterfaceMetadata[] = [
     preferredDimensions: { width: 430, height: 932 },
     keywords: ['code preview', 'preview tab', 'html preview', 'output log'],
   },
+  {
+    id: 'codebase',
+    name: 'AXON Source',
+    route: 'codebase',
+    category: 'Workspace',
+    level: 'root',
+    description: 'Read-only repository file tree, internal source code, and project exports',
+    isAvailable: true,
+    isScrollable: true,
+    preferredDimensions: { width: 430, height: 932 },
+    keywords: [
+      'source',
+      'axon source',
+      'codebase',
+      'source code',
+      'repository',
+      'file tree',
+      'files tree',
+      'internal source',
+      'repo',
+      'project files',
+      'src',
+    ],
+  },
 
   {
     id: 'automation',
@@ -958,6 +982,8 @@ export function getInterfaceById(idOrRoute: string): InterfaceMetadata | undefin
 
 export interface InterfaceQueryResolution {
   match?: InterfaceMetadata;
+  isExact?: boolean;
+  isInferred?: boolean;
   isAll?: boolean;
   isCurrent?: boolean;
   isLongImage?: boolean;
@@ -965,13 +991,24 @@ export interface InterfaceQueryResolution {
   isAmbiguous?: boolean;
   candidates?: InterfaceMetadata[];
   unrecognizedName?: string;
+  confidenceScore?: number;
 }
 
 /**
  * Resolves a natural language query against registered interfaces.
+ * Uses a robust 6-tier ranking strategy:
+ * 1. Exact interface ID, route, or full name
+ * 2. Exact unique keyword / alias
+ * 3. Highly specific multi-word match
+ * 4. Strong unique partial / prefix match on distinctive words
+ * 5. Meaningful token match
+ * 6. Weak fuzzy match
+ * Generic parent containers (e.g. 'AXON Dual-Pane Workspace') do NOT
+ * outrank specific destinations merely because they share the generic token 'axon'.
  */
 export function resolveInterfaceFromQuery(query: string, currentScreen?: ScreenId): InterfaceQueryResolution {
   const normalized = query.trim().toLowerCase();
+  const interfaces = discoverAvailableInterfaces();
 
   // Check for "All interfaces" intent
   if (
@@ -989,8 +1026,6 @@ export function resolveInterfaceFromQuery(query: string, currentScreen?: ScreenI
     };
   }
 
-  const interfaces = discoverAvailableInterfaces();
-
   // Check for "Current interface" intent
   if (
     normalized.includes('current interface') ||
@@ -1004,78 +1039,204 @@ export function resolveInterfaceFromQuery(query: string, currentScreen?: ScreenI
     return {
       isCurrent: true,
       match: currentMeta,
+      isExact: true,
       isLongImage: normalized.includes('long image'),
       isPdf: normalized.includes('pdf'),
     };
   }
 
-  // Check exact ID or route
-  const exact = interfaces.find(
+  // Tier 1: Exact ID or route match
+  const exactIdOrRoute = interfaces.find(
     (item) => item.id.toLowerCase() === normalized || item.route.toLowerCase() === normalized
   );
-  if (exact) {
+  if (exactIdOrRoute) {
     return {
-      match: exact,
+      match: exactIdOrRoute,
+      isExact: true,
       isLongImage: normalized.includes('long image'),
       isPdf: normalized.includes('pdf'),
     };
   }
 
-  // Score matches based on name and keywords
-  const scores: Array<{ item: InterfaceMetadata; score: number }> = [];
+  // Tier 1: Exact Name match (case-insensitive)
+  const exactName = interfaces.find(
+    (item) => item.name.toLowerCase() === normalized
+  );
+  if (exactName) {
+    return {
+      match: exactName,
+      isExact: true,
+      isLongImage: normalized.includes('long image'),
+      isPdf: normalized.includes('pdf'),
+    };
+  }
+
+  // Tier 1.5: Exact Name without generic "AXON " prefix
+  // e.g. query "source" matches "AXON Source", "code" matches "AXON Code", "workspace" matches "AXON Workspace Pane"
+  const exactWithoutAxon = interfaces.filter(
+    (item) => item.name.toLowerCase().replace(/^axon\s+/i, '').trim() === normalized
+  );
+  if (exactWithoutAxon.length === 1) {
+    return {
+      match: exactWithoutAxon[0],
+      isExact: true,
+      isLongImage: normalized.includes('long image'),
+      isPdf: normalized.includes('pdf'),
+    };
+  }
+
+  // Extract query tokens and separate distinctive tokens from generic tokens
+  const GENERIC_TOKENS = new Set(['axon', 'the', 'a', 'an', 'screen', 'interface', 'view', 'pane', 'page', 'app']);
+  const queryTokens = normalized
+    .replace(/[^\w\s-]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean);
+  const distinctiveQueryTokens = queryTokens.filter((t) => !GENERIC_TOKENS.has(t));
+
+  // Score matches based on multi-tier semantic specificity
+  const scores: Array<{ item: InterfaceMetadata; score: number; isExactMatch?: boolean; isPrefixMatch?: boolean }> = [];
 
   for (const item of interfaces) {
     const itemName = item.name.toLowerCase();
+    const cleanItemName = itemName.replace(/^axon\s+/i, '').trim();
+    const nameTokens = itemName
+      .replace(/[^\w\s-]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
+    const distinctiveNameTokens = nameTokens.filter((t) => !GENERIC_TOKENS.has(t));
+
     let score = 0;
+    let isExactMatch = false;
+    let isPrefixMatch = false;
 
-    // Direct name match or containment
-    if (normalized === itemName) {
-      score += 100;
-    } else if (normalized.includes(itemName)) {
-      score += 50 + itemName.length;
-    } else if (itemName.includes(normalized)) {
-      score += 30;
-    }
+    // Check if item has any match on distinctive query tokens
+    let matchedDistinctiveCount = 0;
+    for (const qToken of distinctiveQueryTokens) {
+      const matchesName = distinctiveNameTokens.some((nt) => nt === qToken);
+      const prefixesName = qToken.length >= 2 && distinctiveNameTokens.some((nt) => nt.startsWith(qToken));
+      const matchesKeyword = item.keywords.some((kw) => {
+        const kwLower = kw.toLowerCase();
+        const kwTokens = kwLower.split(/\s+/);
+        return kwTokens.includes(qToken) || (qToken.length >= 2 && kwTokens.some((kt) => kt.startsWith(qToken)));
+      });
 
-    // Keyword match
-    for (const kw of item.keywords) {
-      if (normalized === kw) {
-        score += 80;
-      } else if (normalized.includes(kw)) {
-        score += 20 + kw.length;
+      if (matchesName) {
+        matchedDistinctiveCount++;
+        score += 2500;
+      } else if (prefixesName) {
+        matchedDistinctiveCount++;
+        score += 2000 + qToken.length * 100;
+        isPrefixMatch = true;
+      } else if (matchesKeyword) {
+        matchedDistinctiveCount++;
+        score += 800;
       }
     }
 
+    // Crucial rule: If the user provided distinctive tokens (e.g. 'source', 'sou', 'collage', 'tools'),
+    // an interface that matched NONE of them (e.g. generic 'axon' workspace) must NOT qualify!
+    if (distinctiveQueryTokens.length > 0 && matchedDistinctiveCount === 0) {
+      continue;
+    }
+
+    // Tier 2: Exact keyword match
+    for (const kw of item.keywords) {
+      const kwLower = kw.toLowerCase().trim();
+      const cleanKw = kwLower.replace(/^axon\s+/i, '').trim();
+      if (normalized === kwLower) {
+        score += 5000 + kwLower.length * 20;
+        isExactMatch = true;
+      } else if (normalized === cleanKw) {
+        score += 4500 + cleanKw.length * 20;
+        isExactMatch = true;
+      } else if (distinctiveQueryTokens.length > 0 && distinctiveQueryTokens.join(' ') === cleanKw) {
+        score += 4000;
+        isExactMatch = true;
+      }
+    }
+
+    // Tier 3: All distinctive tokens match
+    if (distinctiveQueryTokens.length > 0 && matchedDistinctiveCount === distinctiveQueryTokens.length) {
+      score += 3000 + distinctiveQueryTokens.length * 500;
+    }
+
+    // Phrase containment on clean name
+    if (normalized.includes(cleanItemName) && cleanItemName.length > 3) {
+      score += 2500;
+    } else if (cleanItemName.includes(normalized) && normalized.length > 2) {
+      score += 1800;
+      if (cleanItemName.startsWith(normalized)) {
+        score += 500;
+        isPrefixMatch = true;
+      }
+    }
+
+    // Generic token contribution (tiny, only relevant if distinctive tokens also matched or if query is purely generic)
+    if (queryTokens.some((t) => t === 'axon') && nameTokens.includes('axon')) {
+      score += 50;
+    }
+
+    // Favor root and sub_tool destinations over deeply nested internal modals unless specifically queried
+    if (item.level === 'root') {
+      score += 200;
+    } else if (item.level === 'sub_tool') {
+      score += 150;
+    }
+
+    // Sub-tool specific keyword bonus (e.g. 'collage' for Image Tools • Collage Grid)
+    if (item.subState && distinctiveQueryTokens.some((t) => itemName.includes(t))) {
+      score += 250;
+    }
+
     if (score > 0) {
-      scores.push({ item, score });
+      scores.push({ item, score, isExactMatch, isPrefixMatch });
     }
   }
 
+  // Sort by score descending
   scores.sort((a, b) => b.score - a.score);
 
   if (scores.length === 0) {
-    // If user asked "show me X" or "capture X" and nothing matched
-    const capturedNameMatch = normalized.match(/(?:capture|show\s+me|image\s+of)\s+(?:the\s+)?([^.?!,]+)/i);
+    // Check if it looks like a capture or navigation attempt with unrecognized name
+    const capturedNameMatch = normalized.match(/(?:capture|show\s+me|image\s+of|open)\s+(?:the\s+)?([^.?!,]+)/i);
     const candidateName = capturedNameMatch ? capturedNameMatch[1].trim() : normalized;
     return {
       isAmbiguous: true,
-      candidates: interfaces.slice(0, 5),
+      candidates: interfaces.filter((i) => i.level === 'root').slice(0, 5),
       unrecognizedName: candidateName,
     };
   }
 
-  // If top score is dominant, pick it
   const top = scores[0];
   const second = scores[1];
-  if (second && second.score >= top.score * 0.9 && top.score < 40) {
+
+  // If top candidate is exact or decisively dominant
+  const isDominant = !second || top.score >= second.score * 1.6 || top.score - second.score >= 1500;
+
+  if (isDominant) {
+    // If it was an exact match on name, clean name, or keyword
+    const isExact = Boolean(top.isExactMatch);
+    const isInferred = !isExact;
+
     return {
-      isAmbiguous: true,
-      candidates: scores.slice(0, 4).map((s) => s.item),
+      match: top.item,
+      isExact,
+      isInferred,
+      confidenceScore: top.score,
+      isLongImage: normalized.includes('long image'),
+      isPdf: normalized.includes('pdf'),
     };
   }
 
+  // Multiple plausible matches with comparable scores
+  const plausibleCandidates = scores
+    .filter((s) => s.score >= top.score * 0.7)
+    .slice(0, 4)
+    .map((s) => s.item);
+
   return {
-    match: top.item,
+    isAmbiguous: true,
+    candidates: plausibleCandidates,
     isLongImage: normalized.includes('long image'),
     isPdf: normalized.includes('pdf'),
   };

@@ -991,6 +991,26 @@ export const ChatPane: React.FC = () => {
                     onImageClick={(url, alt) => setSelectedImage({ url, name: alt })}
                   />
 
+                  {/* Clickable Command Options: Rendered when AXON presents directory or choices */}
+                  {msg.commandOptions && msg.commandOptions.length > 0 && (
+                    <div className="mt-3 pt-2.5 border-t border-black/10 dark:border-white/10 flex flex-wrap gap-2">
+                      {msg.commandOptions.map((opt, optIdx) => (
+                        <button
+                          key={`cmd-opt-${msg.id}-${optIdx}`}
+                          id={`chat-cmd-opt-${opt.destinationId || optIdx}`}
+                          type="button"
+                          onClick={() => {
+                            addMessage(opt.actionText);
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs font-medium active:scale-95 transition-all shadow-xs cursor-pointer"
+                          title={`Execute ${opt.actionText}`}
+                        >
+                          <span>{opt.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   {/* Conditional View Result Button: Only appears right after a code build/run actually happened */}
                   {hasBuildRunResult && (
                     <div className="mt-2.5 pt-2 border-t border-black/10 dark:border-white/10 flex items-center justify-between gap-2">

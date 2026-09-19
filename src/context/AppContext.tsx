@@ -2344,6 +2344,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           modelUsed: commandResult.modelUsed || (commandResult.executed
             ? 'AXON Command Router'
             : 'AXON Command Router (Notice)'),
+          commandOptions: commandResult.options,
         },
       ]);
       return;

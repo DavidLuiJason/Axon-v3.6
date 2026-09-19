@@ -11,6 +11,7 @@ import { ChatPane } from '../components/ChatPane';
 import { WorkspacePane } from '../components/WorkspacePane';
 import { ToolsMenuScreen } from '../screens/ToolsMenuScreen';
 import { AxonCodeScreen } from '../screens/AxonCodeScreen';
+import { CodebaseScreen } from '../screens/CodebaseScreen';
 import { AutomationScreen } from '../screens/AutomationScreen';
 import { VideoEditorScreen } from '../screens/VideoEditorScreen';
 import { NotesScreen } from '../screens/NotesScreen';
@@ -62,6 +63,7 @@ registry.set('tools', ToolsMenuScreen);
 registry.set('code', AxonCodeScreen);
 registry.set('code-editor', (props: any) => <AxonCodeScreen initialTab="code" {...props} />);
 registry.set('code-preview', (props: any) => <AxonCodeScreen initialTab="preview" {...props} />);
+registry.set('codebase', CodebaseScreen);
 
 // Automation and Sub-views
 registry.set('automation', AutomationScreen);
