@@ -992,24 +992,64 @@ export const ChatPane: React.FC = () => {
                   />
 
                   {/* Clickable Command Options: Rendered when AXON presents directory or choices */}
-                  {msg.commandOptions && msg.commandOptions.length > 0 && (
-                    <div className="mt-3 pt-2.5 border-t border-black/10 dark:border-white/10 flex flex-wrap gap-2">
-                      {msg.commandOptions.map((opt, optIdx) => (
-                        <button
-                          key={`cmd-opt-${msg.id}-${optIdx}`}
-                          id={`chat-cmd-opt-${opt.destinationId || optIdx}`}
-                          type="button"
-                          onClick={() => {
-                            addMessage(opt.actionText);
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs font-medium active:scale-95 transition-all shadow-xs cursor-pointer"
-                          title={`Execute ${opt.actionText}`}
-                        >
-                          <span>{opt.label}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                  {msg.commandOptions && msg.commandOptions.length > 0 && (() => {
+                    const hasCategories = msg.commandOptions.some((o) => Boolean(o.category));
+                    if (hasCategories) {
+                      const groups: { [cat: string]: typeof msg.commandOptions } = {};
+                      for (const opt of msg.commandOptions) {
+                        const cat = opt.category || 'Destinations';
+                        if (!groups[cat]) groups[cat] = [];
+                        groups[cat].push(opt);
+                      }
+
+                      return (
+                        <div className="mt-3 pt-2.5 border-t border-black/10 dark:border-white/10 space-y-3">
+                          {Object.entries(groups).map(([catName, opts]) => (
+                            <div key={catName} className="space-y-1.5">
+                              <div className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
+                                {catName}
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {opts.map((opt, optIdx) => (
+                                  <button
+                                    key={`cmd-opt-${msg.id}-${opt.destinationId || optIdx}`}
+                                    id={`chat-cmd-opt-${opt.destinationId || optIdx}`}
+                                    type="button"
+                                    onClick={() => {
+                                      addMessage(opt.actionText);
+                                    }}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs font-medium active:scale-95 transition-all shadow-xs cursor-pointer"
+                                    title={`Open ${opt.label}`}
+                                  >
+                                    <span>{opt.label}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div className="mt-3 pt-2.5 border-t border-black/10 dark:border-white/10 flex flex-wrap gap-2">
+                        {msg.commandOptions.map((opt, optIdx) => (
+                          <button
+                            key={`cmd-opt-${msg.id}-${optIdx}`}
+                            id={`chat-cmd-opt-${opt.destinationId || optIdx}`}
+                            type="button"
+                            onClick={() => {
+                              addMessage(opt.actionText);
+                            }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs font-medium active:scale-95 transition-all shadow-xs cursor-pointer"
+                            title={`Open ${opt.label}`}
+                          >
+                            <span>{opt.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    );
+                  })()}
 
                   {/* Conditional View Result Button: Only appears right after a code build/run actually happened */}
                   {hasBuildRunResult && (

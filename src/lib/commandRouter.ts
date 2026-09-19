@@ -351,17 +351,21 @@ function handleOpenCommand(
     const rootInterfaces = interfaces.filter((i) => i.level === 'root' && i.isAvailable !== false);
     const subToolInterfaces = interfaces.filter((i) => i.level === 'sub_tool' && i.isAvailable !== false);
 
-    // Primary clickable destinations
-    const primaryOptions: ChatCommandOption[] = [
-      { label: 'AXON Source', actionText: '/open codebase', destinationId: 'codebase' },
-      { label: 'AXON Code', actionText: '/open code', destinationId: 'code' },
-      { label: 'Tools & Utilities', actionText: '/open tools', destinationId: 'tools' },
-      { label: 'Settings', actionText: '/open settings', destinationId: 'settings' },
-      { label: 'Library & Notes', actionText: '/open notes', destinationId: 'notes' },
-      { label: 'Storage & Manifest', actionText: '/open storage', destinationId: 'storage' },
-      { label: 'Image Utilities', actionText: '/open tool_images', destinationId: 'tool_images' },
-      { label: 'Automation & Run Code', actionText: '/open automation', destinationId: 'automation' },
-    ];
+    const rootOptions: ChatCommandOption[] = rootInterfaces.map((i) => ({
+      label: i.name,
+      actionText: `/open ${i.id}`,
+      destinationId: i.id,
+      description: i.description,
+      category: 'Core Workspace Screens',
+    }));
+
+    const toolOptions: ChatCommandOption[] = subToolInterfaces.map((i) => ({
+      label: i.name,
+      actionText: `/open ${i.id}`,
+      destinationId: i.id,
+      description: i.description,
+      category: 'Specialized Utility Suites',
+    }));
 
     // Set pending choice so typing any listed destination resolves immediately
     setPendingChoice({
@@ -371,15 +375,12 @@ function handleOpenCommand(
       timestamp: Date.now(),
     });
 
-    const rootList = rootInterfaces.map((i) => `- **${i.name}** (\`/open ${i.id}\`)`).join('\n');
-    const toolList = subToolInterfaces.map((i) => `- **${i.name}** (\`/open ${i.id}\`)`).join('\n');
-
     return {
       handled: true,
       executed: false,
-      response: `### AXON Interface Directory\n\nChoose a destination by clicking an option below or typing \`/open <target>\`:\n\n**Core Workspace Screens:**\n${rootList}\n\n**Specialized Utility Suites:**\n${toolList}`,
+      response: `### AXON Interface Directory\n\nChoose a destination:`,
       commandName: '/open',
-      options: primaryOptions,
+      options: [...rootOptions, ...toolOptions],
     };
   }
 
@@ -466,14 +467,10 @@ function handleOpenCommand(
       description: c.description,
     }));
 
-    const candidateList = candidates
-      .map((c, i) => `${i + 1}. **${c.name}** (\`/open ${c.id}\`)`)
-      .join('\n');
-
     return {
       handled: true,
       executed: false,
-      response: `Could not uniquely identify an interface for "${rawTarget}".\n\nDid you mean one of these?\n${candidateList}`,
+      response: `Could not uniquely identify an interface for "${rawTarget}".\n\nDid you mean one of these?`,
       commandName: '/open',
       options,
     };
