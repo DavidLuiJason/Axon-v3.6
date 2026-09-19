@@ -121,8 +121,65 @@ results.push({
   details: `"open settings" -> screen: ${resNL1.targetScreen}, "go to tools" -> screen: ${resNL2.targetScreen}`,
 });
 
-// Test 7: Verify existing command waterfall is NOT broken
-// 7a: Settings command (e.g. "switch to dark")
+// Test 7: Math expression routing via commandRouter
+resetMock();
+const math1 = evaluateChatCommand('15 * 8', mockActions, 'axon');
+const passMath1 =
+  math1.handled === true &&
+  math1.executed === true &&
+  math1.response === '15 * 8 = 120' &&
+  math1.commandName === 'math' &&
+  math1.modelUsed === 'AXON Offline Calculator Engine' &&
+  navigatedScreen === null;
+
+const math2 = evaluateChatCommand('15% of 80', mockActions, 'axon');
+const passMath2 =
+  math2.handled === true &&
+  math2.executed === true &&
+  math2.response === '15% of 80 = 12' &&
+  math2.commandName === 'math' &&
+  navigatedScreen === null;
+
+const math3 = evaluateChatCommand('sqrt(144)', mockActions, 'axon');
+const passMath3 =
+  math3.handled === true &&
+  math3.executed === true &&
+  math3.response === 'sqrt(144) = 12' &&
+  math3.commandName === 'math' &&
+  navigatedScreen === null;
+
+const math4 = evaluateChatCommand('what is 1 + 1', mockActions, 'axon');
+const passMath4 =
+  math4.handled === true &&
+  math4.executed === true &&
+  math4.response === '1 + 1 = 2' &&
+  math4.commandName === 'math' &&
+  navigatedScreen === null;
+
+results.push({
+  name: 'Test 7: Math commands routed via Command Router ("15 * 8", "15% of 80", "sqrt(144)", "what is 1 + 1")',
+  passed: passMath1 && passMath2 && passMath3 && passMath4,
+  details: `15 * 8: "${math1.response}", 15% of 80: "${math2.response}", sqrt(144): "${math3.response}", what is 1 + 1: "${math4.response}"`,
+});
+
+// Test 8: Non-math conversational messages are NOT intercepted as math
+resetMock();
+const nonMath1 = evaluateChatCommand('I have 15 apples and 8 oranges', mockActions, 'axon');
+const nonMath2 = evaluateChatCommand('what is the meaning of life', mockActions, 'axon');
+const nonMath3 = evaluateChatCommand('100 reasons to code', mockActions, 'axon');
+const passNonMath =
+  nonMath1.handled === false &&
+  nonMath2.handled === false &&
+  nonMath3.handled === false &&
+  navigatedScreen === null;
+
+results.push({
+  name: 'Test 8: Non-math conversational text is NOT intercepted as math',
+  passed: passNonMath,
+  details: `Conversational phrases correctly returned handled: false.`,
+});
+
+// Test 9: Existing command non-interference (Settings, Storage)
 resetMock();
 const cmdRouterForDark = evaluateChatCommand('switch to dark', mockActions, 'axon');
 let themeModeSet = '';
@@ -148,7 +205,6 @@ const settingsRes = evaluateSettingsCommand('switch to dark', {
   setNotificationsEnabled: () => {},
 });
 
-// 7b: Storage command
 const cmdRouterForStorage = evaluateChatCommand('how much storage do I have left', mockActions, 'axon');
 let storageReallocated = false;
 let packAdded = false;
@@ -164,25 +220,19 @@ const storageRes = handleStorageChatCommand(
   }
 );
 
-// 7c: Math expression
-const cmdRouterForMath = evaluateChatCommand('15 * 8', mockActions, 'axon');
-const mathRes = tryEvaluateMathExpression('15 * 8');
-
-const pass7 =
+const pass9 =
   cmdRouterForDark.handled === false && // Command router does not intercept settings command
   settingsRes.handled === true &&
   settingsRes.executed === true &&
   themeModeSet === 'dark' &&
   cmdRouterForStorage.handled === false && // Command router does not intercept storage command
   storageRes !== null &&
-  storageRes.includes('Storage Manifest Report') &&
-  cmdRouterForMath.handled === false && // Command router does not intercept math
-  mathRes === '15 * 8 = 120';
+  storageRes.includes('Storage Manifest Report');
 
 results.push({
-  name: 'Test 7: Existing command waterfall non-interference (Settings, Storage, Math)',
-  passed: pass7,
-  details: `Settings command handled: ${settingsRes.handled} (theme: ${themeModeSet}), Storage command handled: ${storageRes !== null}, Math handled: ${mathRes === '15 * 8 = 120'}`,
+  name: 'Test 9: Existing command non-interference (Settings, Storage)',
+  passed: pass9,
+  details: `Settings command handled: ${settingsRes.handled} (theme: ${themeModeSet}), Storage command handled: ${storageRes !== null}`,
 });
 
 // Print summary

@@ -59,10 +59,7 @@ import {
   calculateDeviceAwareBudget,
 } from '../lib/storageManifest';
 import { exportChatToPdf, exportChatToImagePdf } from '../lib/pdfExport';
-import {
-  tryEvaluateMathExpression,
-  handleStorageChatCommand,
-} from '../lib/storageChatHandler';
+import { handleStorageChatCommand } from '../lib/storageChatHandler';
 import { handleSettingsChatCommand } from '../lib/settingsChatHandler';
 import { evaluateSettingsCommand } from '../lib/chatCapabilityManifest';
 import { evaluateInterfaceCaptureChatCommand } from '../lib/interfaceCaptureChatHandler';
@@ -2344,9 +2341,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           text: commandResult.response,
           projectId: activeProjectId,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          modelUsed: commandResult.executed
+          modelUsed: commandResult.modelUsed || (commandResult.executed
             ? 'AXON Command Router'
-            : 'AXON Command Router (Notice)',
+            : 'AXON Command Router (Notice)'),
         },
       ]);
       return;
@@ -2395,23 +2392,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch (err: any) {
         console.warn('Run code command execution failed', err);
       }
-    }
-
-    // 1. Check for fast-path offline arithmetic calculation (e.g. "what is 1+1", "50 * 4", "15% of 80")
-    const mathResult = tryEvaluateMathExpression(text);
-    if (mathResult) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `msg-${Date.now()}-calc`,
-          sender: 'axon',
-          text: mathResult,
-          projectId: activeProjectId,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          modelUsed: 'AXON Offline Calculator Engine',
-        },
-      ]);
-      return;
     }
 
     // 2. Check for conversational storage queries & reallocation / pack commands

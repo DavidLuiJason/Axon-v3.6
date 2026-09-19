@@ -4,6 +4,7 @@ import {
   discoverAvailableInterfaces,
   InterfaceMetadata,
 } from './interfaceRegistry';
+import { tryEvaluateMathExpression } from './storageChatHandler';
 
 export interface CommandRouterActions {
   navigateTo: (
@@ -23,6 +24,7 @@ export interface CommandExecutionResult {
   response: string;
   targetScreen?: ScreenId;
   commandName?: string;
+  modelUsed?: string;
 }
 
 /**
@@ -52,6 +54,18 @@ export function evaluateChatCommand(
   if (naturalMatch && naturalMatch[1]) {
     const candidateTarget = naturalMatch[1].trim();
     return handleOpenCommand(candidateTarget, actions, currentScreen, false);
+  }
+
+  // 3. Fast-path offline arithmetic calculation (reusing existing tryEvaluateMathExpression)
+  const mathResult = tryEvaluateMathExpression(trimmed);
+  if (mathResult) {
+    return {
+      handled: true,
+      executed: true,
+      response: mathResult,
+      commandName: 'math',
+      modelUsed: 'AXON Offline Calculator Engine',
+    };
   }
 
   return { handled: false, response: '' };
