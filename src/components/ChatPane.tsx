@@ -28,6 +28,9 @@ import {
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { ChatAttachment } from '../types';
+import { ContextualMessageActions, ContextualMessageActionsProps } from './ContextualMessageActions';
+export { ContextualMessageActions };
+export type { ContextualMessageActionsProps };
 import { AxonLogo } from './AxonLogo';
 import { ModelSelectorModal } from './ModelSelectorModal';
 import { ChatShortcutBar } from './ChatShortcutBar';
@@ -991,73 +994,13 @@ export const ChatPane: React.FC = () => {
                     onImageClick={(url, alt) => setSelectedImage({ url, name: alt })}
                   />
 
-                  {/* Contextual Actions / Command Options: Rendered when AXON presents contextual shortcuts or choices */}
-                  {(() => {
-                    const actionsList = (msg.actions && msg.actions.length > 0) ? msg.actions : msg.commandOptions;
-                    if (!actionsList || actionsList.length === 0) return null;
-
-                    const renderActionButton = (opt: any, optIdx: number) => {
-                      const buttonId = opt.destinationId
-                        ? `chat-cmd-opt-${opt.destinationId}`
-                        : `chat-action-btn-${msg.id}-${opt.targetId || optIdx}`;
-                      const isSecondary = opt.variant === 'secondary';
-                      const isDanger = opt.variant === 'danger';
-                      const buttonStyle = isSecondary
-                        ? 'bg-neutral-200/90 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-700'
-                        : isDanger
-                        ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/25'
-                        : 'bg-white text-black hover:bg-neutral-200';
-
-                      return (
-                        <button
-                          key={`cmd-opt-${msg.id}-${opt.destinationId || opt.targetId || optIdx}`}
-                          id={buttonId}
-                          type="button"
-                          onClick={() => {
-                            addMessage(opt.actionText);
-                          }}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${buttonStyle} active:scale-95 transition-all text-xs font-semibold shadow-xs cursor-pointer`}
-                          title={opt.description || opt.label}
-                        >
-                          {opt.icon === 'eye' && <Eye className="w-3.5 h-3.5 shrink-0" />}
-                          {opt.icon === 'check' && <Check className="w-3.5 h-3.5 shrink-0" />}
-                          {opt.icon === 'sparkles' && <Sparkles className="w-3.5 h-3.5 shrink-0" />}
-                          <span>{opt.label}</span>
-                        </button>
-                      );
-                    };
-
-                    const hasCategories = actionsList.some((o) => Boolean(o.category));
-                    if (hasCategories) {
-                      const groups: { [cat: string]: typeof actionsList } = {};
-                      for (const opt of actionsList) {
-                        const cat = opt.category || 'Destinations';
-                        if (!groups[cat]) groups[cat] = [];
-                        groups[cat].push(opt);
-                      }
-
-                      return (
-                        <div className="mt-3 pt-2.5 border-t border-black/10 dark:border-white/10 space-y-3">
-                          {Object.entries(groups).map(([catName, opts]) => (
-                            <div key={catName} className="space-y-1.5">
-                              <div className="text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                                {catName}
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {opts.map((opt, optIdx) => renderActionButton(opt, optIdx))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      );
-                    }
-
-                    return (
-                      <div className="mt-3 pt-2.5 border-t border-black/10 dark:border-white/10 flex flex-wrap gap-2">
-                        {actionsList.map((opt, optIdx) => renderActionButton(opt, optIdx))}
-                      </div>
-                    );
-                  })()}
+                  {/* Contextual Actions / Command Options: Smallest safe reusable rendering foundation */}
+                  <ContextualMessageActions
+                    actions={msg.actions}
+                    commandOptions={msg.commandOptions}
+                    messageId={msg.id}
+                    onActionClick={addMessage}
+                  />
 
                   {/* Conditional View Result Button: Only appears right after a code build/run actually happened */}
                   {hasBuildRunResult && (
