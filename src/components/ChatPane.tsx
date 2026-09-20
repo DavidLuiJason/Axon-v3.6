@@ -991,12 +991,46 @@ export const ChatPane: React.FC = () => {
                     onImageClick={(url, alt) => setSelectedImage({ url, name: alt })}
                   />
 
-                  {/* Clickable Command Options: Rendered when AXON presents directory or choices */}
-                  {msg.commandOptions && msg.commandOptions.length > 0 && (() => {
-                    const hasCategories = msg.commandOptions.some((o) => Boolean(o.category));
+                  {/* Contextual Actions / Command Options: Rendered when AXON presents contextual shortcuts or choices */}
+                  {(() => {
+                    const actionsList = (msg.actions && msg.actions.length > 0) ? msg.actions : msg.commandOptions;
+                    if (!actionsList || actionsList.length === 0) return null;
+
+                    const renderActionButton = (opt: any, optIdx: number) => {
+                      const buttonId = opt.destinationId
+                        ? `chat-cmd-opt-${opt.destinationId}`
+                        : `chat-action-btn-${msg.id}-${opt.targetId || optIdx}`;
+                      const isSecondary = opt.variant === 'secondary';
+                      const isDanger = opt.variant === 'danger';
+                      const buttonStyle = isSecondary
+                        ? 'bg-neutral-200/90 text-neutral-800 dark:bg-neutral-800 dark:text-neutral-200 hover:bg-neutral-300 dark:hover:bg-neutral-700'
+                        : isDanger
+                        ? 'bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/20 hover:bg-red-500/25'
+                        : 'bg-white text-black hover:bg-neutral-200';
+
+                      return (
+                        <button
+                          key={`cmd-opt-${msg.id}-${opt.destinationId || opt.targetId || optIdx}`}
+                          id={buttonId}
+                          type="button"
+                          onClick={() => {
+                            addMessage(opt.actionText);
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl ${buttonStyle} active:scale-95 transition-all text-xs font-semibold shadow-xs cursor-pointer`}
+                          title={opt.description || opt.label}
+                        >
+                          {opt.icon === 'eye' && <Eye className="w-3.5 h-3.5 shrink-0" />}
+                          {opt.icon === 'check' && <Check className="w-3.5 h-3.5 shrink-0" />}
+                          {opt.icon === 'sparkles' && <Sparkles className="w-3.5 h-3.5 shrink-0" />}
+                          <span>{opt.label}</span>
+                        </button>
+                      );
+                    };
+
+                    const hasCategories = actionsList.some((o) => Boolean(o.category));
                     if (hasCategories) {
-                      const groups: { [cat: string]: typeof msg.commandOptions } = {};
-                      for (const opt of msg.commandOptions) {
+                      const groups: { [cat: string]: typeof actionsList } = {};
+                      for (const opt of actionsList) {
                         const cat = opt.category || 'Destinations';
                         if (!groups[cat]) groups[cat] = [];
                         groups[cat].push(opt);
@@ -1010,20 +1044,7 @@ export const ChatPane: React.FC = () => {
                                 {catName}
                               </div>
                               <div className="flex flex-wrap gap-2">
-                                {opts.map((opt, optIdx) => (
-                                  <button
-                                    key={`cmd-opt-${msg.id}-${opt.destinationId || optIdx}`}
-                                    id={`chat-cmd-opt-${opt.destinationId || optIdx}`}
-                                    type="button"
-                                    onClick={() => {
-                                      addMessage(opt.actionText);
-                                    }}
-                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs font-medium active:scale-95 transition-all shadow-xs cursor-pointer"
-                                    title={`Open ${opt.label}`}
-                                  >
-                                    <span>{opt.label}</span>
-                                  </button>
-                                ))}
+                                {opts.map((opt, optIdx) => renderActionButton(opt, optIdx))}
                               </div>
                             </div>
                           ))}
@@ -1033,20 +1054,7 @@ export const ChatPane: React.FC = () => {
 
                     return (
                       <div className="mt-3 pt-2.5 border-t border-black/10 dark:border-white/10 flex flex-wrap gap-2">
-                        {msg.commandOptions.map((opt, optIdx) => (
-                          <button
-                            key={`cmd-opt-${msg.id}-${optIdx}`}
-                            id={`chat-cmd-opt-${opt.destinationId || optIdx}`}
-                            type="button"
-                            onClick={() => {
-                              addMessage(opt.actionText);
-                            }}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-300 dark:border-neutral-700 bg-neutral-100 hover:bg-neutral-200 dark:bg-neutral-800 dark:hover:bg-neutral-700 text-neutral-900 dark:text-neutral-100 text-xs font-medium active:scale-95 transition-all shadow-xs cursor-pointer"
-                            title={`Open ${opt.label}`}
-                          >
-                            <span>{opt.label}</span>
-                          </button>
-                        ))}
+                        {actionsList.map((opt, optIdx) => renderActionButton(opt, optIdx))}
                       </div>
                     );
                   })()}

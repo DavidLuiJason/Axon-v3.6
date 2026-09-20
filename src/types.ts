@@ -70,20 +70,100 @@ export interface WorkspaceSnippetHistoryItem {
   byteSize?: number;
 }
 
-export interface ChatCommandOption {
+/**
+ * Structured contextual action representing a purpose-driven user interaction attached to a message.
+ * Supports single shortcuts, alternative selections, confirmations, navigations, retries, and task controls.
+ * Fully backwards-compatible with the ChatCommandOption contract.
+ */
+export interface ContextualMessageAction {
+  /** User-facing label displayed on the action button */
   label: string;
+  /** Executable action/intent text (e.g. '/open calculator', 'yes', 'retry', etc.) executed when clicked or typed */
   actionText: string;
+  /** Optional destination or route ID when this action navigates (e.g. 'calculator', 'settings') */
   destinationId?: string;
-  description?: string;
+  /** Optional target entity or item identifier */
+  targetId?: string;
+  /** Optional category for grouping when multiple related actions are presented */
   category?: string;
+  /** Optional descriptive explanation or tooltip */
+  description?: string;
+  /** Optional semantic intent identifier (e.g. 'open', 'confirm', 'cancel', 'retry', 'navigation', 'action') */
+  intent?: string;
+  /** Optional structured payload or contextual parameters attached to the action */
+  payload?: Record<string, any>;
+  /** Optional icon name or indicator (e.g. 'eye', 'check', 'sparkles') */
+  icon?: string;
+  /** Optional visual variant hint ('default' | 'primary' | 'secondary' | 'danger') */
+  variant?: 'default' | 'primary' | 'secondary' | 'danger' | string;
 }
 
 /**
- * Contextual message action representing an optional user interaction attached to a specific message.
- * Aliases ChatCommandOption to establish the broader concept of purpose-driven contextual message actions
- * while preserving complete backwards compatibility and ensuring execution convergence through addMessage().
+ * Backwards-compatible alias for ContextualMessageAction.
  */
-export type ContextualMessageAction = ChatCommandOption;
+export type ChatCommandOption = ContextualMessageAction;
+
+/**
+ * Core interaction types supported by AXON's generalized pending interaction model.
+ */
+export type PendingInteractionType =
+  | 'selection'
+  | 'confirmation'
+  | 'clarification'
+  | 'approval'
+  | 'cancellation'
+  | 'ambiguity_resolution'
+  | (string & {});
+
+/**
+ * Expected user response classification for a pending interaction.
+ */
+export type ExpectedResponseType =
+  | 'confirmation'
+  | 'selection'
+  | 'text'
+  | 'action'
+  | (string & {});
+
+/**
+ * Generalized pending interaction representing a suspended interaction
+ * where AXON requires user input, choice, confirmation, approval, or clarification
+ * before continuing an operation.
+ */
+export interface PendingInteraction<TTarget = any, TCandidate = any> {
+  /** Unique ID for the interaction instance */
+  id: string;
+  /** Interaction type: selection, confirmation, clarification, approval, cancellation, ambiguity_resolution, etc. */
+  type: PendingInteractionType;
+  /** Originating intent or command (e.g. '/open', 'file_delete') */
+  originatingIntent: string;
+  /** The question or prompt text presented to the user */
+  prompt?: string;
+  /** Legacy promptType for /open backwards compatibility ('confirm' | 'select') */
+  promptType?: 'confirm' | 'select' | string;
+  /** Legacy command field for /open backwards compatibility */
+  command?: string;
+  /** Expected response type ('confirmation' | 'selection' | 'text' | 'action') */
+  expectedResponseType?: ExpectedResponseType;
+  /** Target of confirmation or operation */
+  target?: TTarget;
+  /** Relevant candidates/options for selection or disambiguation */
+  candidates?: TCandidate[];
+  /** Available contextual actions attached to this interaction */
+  actions?: ContextualMessageAction[];
+  /** Creation timestamp in ms */
+  timestamp: number;
+  createdAt?: number;
+  /** Expiration timestamp in ms */
+  expiresAt?: number;
+  /** Max lifetime in ms (defaults to 60000) */
+  ttlMs?: number;
+  /** Arbitrary domain metadata / context needed for safe resolution */
+  metadata?: Record<string, any>;
+  data?: Record<string, any>;
+  /** Reference to a prior interaction ID if this interaction was spawned from ambiguity */
+  precedingInteractionId?: string;
+}
 
 export interface ChatMessage {
   id: string;
@@ -102,6 +182,7 @@ export interface ChatMessage {
   attachment?: ChatAttachment;
   attachments?: ChatAttachment[];
   commandOptions?: ChatCommandOption[];
+  actions?: ContextualMessageAction[];
 }
 
 export interface QueuedTask {

@@ -1,10 +1,24 @@
-import { ScreenId, ChatCommandOption } from '../types';
+import {
+  ScreenId,
+  ChatCommandOption,
+  ContextualMessageAction,
+  PendingInteraction,
+  PendingInteractionType,
+  ExpectedResponseType,
+} from '../types';
 import {
   resolveInterfaceFromQuery,
   discoverAvailableInterfaces,
   InterfaceMetadata,
 } from './interfaceRegistry';
 import { tryEvaluateMathExpression } from './storageChatHandler';
+import {
+  getPendingInteraction,
+  setPendingInteraction,
+  clearPendingInteraction,
+  createAmbiguityResolutionInteraction,
+  PENDING_INTERACTION_EXPIRATION_MS,
+} from './pendingInteraction';
 
 export interface CommandRouterActions {
   navigateTo: (
@@ -25,10 +39,12 @@ export interface CommandExecutionResult {
   targetScreen?: ScreenId;
   commandName?: string;
   modelUsed?: string;
-  options?: ChatCommandOption[];
+  options?: ContextualMessageAction[];
+  actions?: ContextualMessageAction[];
 }
 
-export interface PendingChoiceState {
+export interface PendingChoiceState
+  extends Partial<PendingInteraction<InterfaceMetadata, InterfaceMetadata>> {
   command: string;
   promptType: 'confirm' | 'select';
   target?: InterfaceMetadata;
@@ -36,29 +52,33 @@ export interface PendingChoiceState {
   timestamp: number;
 }
 
-// In-memory pending-choice state surviving between consecutive chat messages
-let activePendingChoice: PendingChoiceState | null = null;
-
-export const PENDING_CHOICE_EXPIRATION_MS = 60000;
+export const PENDING_CHOICE_EXPIRATION_MS = PENDING_INTERACTION_EXPIRATION_MS;
 
 export function getPendingChoice(): PendingChoiceState | null {
-  if (
-    activePendingChoice &&
-    (typeof activePendingChoice.timestamp !== 'number' ||
-      Date.now() - activePendingChoice.timestamp >= PENDING_CHOICE_EXPIRATION_MS)
-  ) {
-    activePendingChoice = null;
-  }
-  return activePendingChoice;
+  return getPendingInteraction() as PendingChoiceState | null;
 }
 
 export function setPendingChoice(choice: PendingChoiceState | null): void {
-  activePendingChoice = choice;
+  setPendingInteraction(choice);
 }
 
 export function clearPendingChoice(): void {
-  activePendingChoice = null;
+  clearPendingInteraction();
 }
+
+export {
+  getPendingInteraction,
+  setPendingInteraction,
+  clearPendingInteraction,
+  createAmbiguityResolutionInteraction,
+  PENDING_INTERACTION_EXPIRATION_MS,
+};
+export type {
+  PendingInteraction,
+  PendingInteractionType,
+  ExpectedResponseType,
+  ContextualMessageAction,
+};
 
 /**
  * Checks if input represents confirmation intent relative to a pending target.
@@ -173,6 +193,45 @@ export function evaluateChatCommand(
       };
     }
 
+    // Check if user is resolving an ambiguity interaction
+    if (pending.type === 'ambiguity_resolution') {
+      const target = pending.target as InterfaceMetadata | undefined;
+      if (target && isConfirmationIntent(trimmed, target)) {
+        clearPendingChoice();
+        actions.navigateTo(target.route as ScreenId, {
+          screenState: target.subState,
+        });
+        const shortcutAction: ContextualMessageAction = {
+          label: `Open ${target.name}`,
+          actionText: `/open ${target.id}`,
+          destinationId: target.id,
+          targetId: target.id,
+          description: `Navigate to ${target.name}`,
+          intent: 'open',
+          variant: 'default',
+        };
+        return {
+          handled: true,
+          executed: true,
+          response: `Opened **${target.name}**.`,
+          targetScreen: target.route as ScreenId,
+          commandName: '/open',
+          options: [shortcutAction],
+          actions: [shortcutAction],
+        };
+      }
+
+      if (/^(?:new|new\s+request|different|neither)$/i.test(trimmed)) {
+        clearPendingChoice();
+        return {
+          handled: true,
+          executed: false,
+          response: 'Starting new request.',
+          commandName: '/open',
+        };
+      }
+    }
+
     // Check if user is confirming a pending single target
     if (pending.promptType === 'confirm' && pending.target) {
       if (isConfirmationIntent(trimmed, pending.target)) {
@@ -181,12 +240,23 @@ export function evaluateChatCommand(
         actions.navigateTo(target.route as ScreenId, {
           screenState: target.subState,
         });
+        const shortcutAction: ContextualMessageAction = {
+          label: `Open ${target.name}`,
+          actionText: `/open ${target.id}`,
+          destinationId: target.id,
+          targetId: target.id,
+          description: `Navigate to ${target.name}`,
+          intent: 'open',
+          variant: 'default',
+        };
         return {
           handled: true,
           executed: true,
           response: `Opened **${target.name}**.`,
           targetScreen: target.route as ScreenId,
           commandName: '/open',
+          options: [shortcutAction],
+          actions: [shortcutAction],
         };
       }
     }
@@ -217,12 +287,23 @@ export function evaluateChatCommand(
         actions.navigateTo(chosen.route as ScreenId, {
           screenState: chosen.subState,
         });
+        const shortcutAction: ContextualMessageAction = {
+          label: `Open ${chosen.name}`,
+          actionText: `/open ${chosen.id}`,
+          destinationId: chosen.id,
+          targetId: chosen.id,
+          description: `Navigate to ${chosen.name}`,
+          intent: 'open',
+          variant: 'default',
+        };
         return {
           handled: true,
           executed: true,
           response: `Opened **${chosen.name}**.`,
           targetScreen: chosen.route as ScreenId,
           commandName: '/open',
+          options: [shortcutAction],
+          actions: [shortcutAction],
         };
       }
 
@@ -246,12 +327,23 @@ export function evaluateChatCommand(
         actions.navigateTo(matchedCand.route as ScreenId, {
           screenState: matchedCand.subState,
         });
+        const shortcutAction: ContextualMessageAction = {
+          label: `Open ${matchedCand.name}`,
+          actionText: `/open ${matchedCand.id}`,
+          destinationId: matchedCand.id,
+          targetId: matchedCand.id,
+          description: `Navigate to ${matchedCand.name}`,
+          intent: 'open',
+          variant: 'default',
+        };
         return {
           handled: true,
           executed: true,
           response: `Opened **${matchedCand.name}**.`,
           targetScreen: matchedCand.route as ScreenId,
           commandName: '/open',
+          options: [shortcutAction],
+          actions: [shortcutAction],
         };
       }
 
@@ -305,6 +397,53 @@ export function evaluateChatCommand(
       !candidateTarget.endsWith('?')
     ) {
       return handleOpenCommand(candidateTarget, actions, currentScreen, false);
+    }
+  }
+
+  // -------------------------------------------------------------
+  // 2.2. Polite navigation requests:
+  // "can you open <target>", "could you open <target>", "would you open <target>"
+  // -------------------------------------------------------------
+  const politeMatch = trimmed.match(
+    /^(?:can\s+you|could\s+you|would\s+you(?:\s+mind)?)\s+(?:please\s+)?(?:open(?:\s+up)?|launch|show(?:\s+me)?|navigate\s+to|take\s+me\s+to)\s+(?:the\s+)?(.+?)[?!.]*$/i
+  );
+  if (politeMatch && politeMatch[1]) {
+    const politeTarget = politeMatch[1].trim();
+    if (!politeTarget.endsWith('?')) {
+      return handleOpenCommand(politeTarget, actions, currentScreen, false);
+    }
+  }
+
+  // -------------------------------------------------------------
+  // 2.5. Single-action contextual navigation inquiries:
+  // e.g. "how do I open the calculator?", "how to open calculator", "where can I find settings"
+  // AXON provides a direct explanation and presents a single contextual shortcut [ Open <Target> ].
+  // -------------------------------------------------------------
+  const helpMatch = trimmed.match(
+    /^(?:how\s+(?:do\s+i|can\s+i|to)|how\s+would\s+i|where\s+can\s+i\s+find|where\s+do\s+i\s+find|where\s+(?:is|are))\s*(?:open|access|find|navigate\s+to|reach|launch)?\s+(?:the\s+)?(.+?)[?!.]*$/i
+  );
+  if (helpMatch && helpMatch[1]) {
+    const rawTarget = helpMatch[1].trim();
+    const resolution = resolveInterfaceFromQuery(rawTarget, currentScreen);
+    if (resolution.isExact && resolution.match) {
+      const target = resolution.match;
+      const categoryHint = target.category ? ` from **${target.category}**` : '';
+      const contextualAction: ContextualMessageAction = {
+        label: `Open ${target.name}`,
+        actionText: `/open ${target.id}`,
+        destinationId: target.id,
+        targetId: target.id,
+        description: `Open ${target.name}`,
+        intent: 'open',
+      };
+      return {
+        handled: true,
+        executed: false,
+        response: `You can open **${target.name}**${categoryHint} or by using the command \`/open ${target.id}\`.`,
+        commandName: '/open',
+        options: [contextualAction],
+        actions: [contextualAction],
+      };
     }
   }
 
@@ -419,12 +558,24 @@ function handleOpenCommand(
         screenState: resolution.match.subState,
       });
 
+      const shortcutAction: ContextualMessageAction = {
+        label: `Open ${resolution.match.name}`,
+        actionText: `/open ${resolution.match.id}`,
+        destinationId: resolution.match.id,
+        targetId: resolution.match.id,
+        description: `Navigate to ${resolution.match.name}`,
+        intent: 'open',
+        variant: 'default',
+      };
+
       return {
         handled: true,
         executed: true,
         response: `Opened **${resolution.match.name}**.`,
         targetScreen: targetRoute,
         commandName: '/open',
+        options: [shortcutAction],
+        actions: [shortcutAction],
       };
     }
   }
@@ -434,15 +585,31 @@ function handleOpenCommand(
     setPendingChoice({
       command: '/open',
       promptType: 'confirm',
+      type: 'confirmation',
+      originatingIntent: '/open',
       target: resolution.match,
       timestamp: Date.now(),
+      ttlMs: 60000,
+      expiresAt: Date.now() + 60000,
     });
 
-    const option: ChatCommandOption = {
-      label: resolution.match.name,
+    const confirmAction: ContextualMessageAction = {
+      label: `Open ${resolution.match.name}`,
       actionText: `/open ${resolution.match.id}`,
       destinationId: resolution.match.id,
-      description: resolution.match.description,
+      targetId: resolution.match.id,
+      description: `Open ${resolution.match.name}`,
+      intent: 'open',
+      variant: 'default',
+    };
+
+    const cancelAction: ContextualMessageAction = {
+      label: 'Cancel',
+      actionText: 'cancel',
+      targetId: 'cancel',
+      description: 'Cancel navigation',
+      intent: 'cancel',
+      variant: 'secondary',
     };
 
     return {
@@ -450,7 +617,8 @@ function handleOpenCommand(
       executed: false,
       response: `Did you mean **${resolution.match.name}**?`,
       commandName: '/open',
-      options: [option],
+      options: [confirmAction, cancelAction],
+      actions: [confirmAction, cancelAction],
     };
   }
 
@@ -465,23 +633,41 @@ function handleOpenCommand(
     setPendingChoice({
       command: '/open',
       promptType: 'select',
+      type: 'selection',
+      originatingIntent: '/open',
       candidates,
       timestamp: Date.now(),
+      ttlMs: 60000,
+      expiresAt: Date.now() + 60000,
     });
 
-    const options: ChatCommandOption[] = candidates.map((c) => ({
+    const candidateActions: ContextualMessageAction[] = candidates.map((c) => ({
       label: c.name,
       actionText: `/open ${c.id}`,
       destinationId: c.id,
+      targetId: c.id,
       description: c.description,
+      intent: 'open',
     }));
+
+    const cancelAction: ContextualMessageAction = {
+      label: 'Cancel',
+      actionText: 'cancel',
+      targetId: 'cancel',
+      description: 'Cancel navigation',
+      intent: 'cancel',
+      variant: 'secondary',
+    };
+
+    const allActions = [...candidateActions, cancelAction];
 
     return {
       handled: true,
       executed: false,
       response: `Could not uniquely identify an interface for "${rawTarget}".\n\nDid you mean one of these?`,
       commandName: '/open',
-      options,
+      options: allActions,
+      actions: allActions,
     };
   }
 

@@ -2344,7 +2344,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           modelUsed: commandResult.modelUsed || (commandResult.executed
             ? 'AXON Command Router'
             : 'AXON Command Router (Notice)'),
-          commandOptions: commandResult.options,
+          commandOptions: commandResult.options || commandResult.actions,
+          actions: commandResult.actions || commandResult.options,
         },
       ]);
       return;
@@ -2403,6 +2404,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       addDownloadablePack
     );
     if (storageCmdResult) {
+      const storageActions = [
+        {
+          label: 'Open Storage Diagnostics',
+          actionText: '/open storage',
+          destinationId: 'storage',
+          targetId: 'storage',
+          description: 'Open Storage Diagnostics',
+          intent: 'open' as const,
+          variant: 'default' as const,
+        },
+      ];
       setMessages((prev) => [
         ...prev,
         {
@@ -2412,6 +2424,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           projectId: activeProjectId,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           modelUsed: 'AXON Storage Engine',
+          actions: storageActions,
+          commandOptions: storageActions,
         },
       ]);
       return;
@@ -2439,6 +2453,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     });
 
     if (settingsEvaluation.handled) {
+      const settingsActions = settingsEvaluation.executed
+        ? [
+            {
+              label: 'Open Settings',
+              actionText: '/open settings',
+              destinationId: 'settings',
+              targetId: 'settings',
+              description: 'Open Settings to view changes',
+              intent: 'open' as const,
+              variant: 'default' as const,
+            },
+          ]
+        : undefined;
+
       setMessages((prev) => [
         ...prev,
         {
@@ -2450,6 +2478,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           modelUsed: settingsEvaluation.executed
             ? 'AXON Settings Controller'
             : 'AXON Capability Manifest',
+          actions: settingsActions,
+          commandOptions: settingsActions,
         },
       ]);
       return;
@@ -2558,6 +2588,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     // AXON's local core is strictly excluded from usage limits and cooldown tracking
     if (currentAccount && currentAccount.provider !== 'axon' && isAccountInCooldown(currentAccount)) {
       const remaining = getRemainingCooldownString(currentAccount);
+      const availableAlts = aiAccounts.filter(
+        (a) => a.id !== currentAccount.id && !isAccountInCooldown(a)
+      );
+      const cooldownActions = [
+        ...availableAlts.slice(0, 2).map((alt) => ({
+          label: `Switch to ${alt.label}`,
+          actionText: `switch to ${alt.label}`,
+          targetId: alt.id,
+          description: `Switch active provider to ${alt.label}`,
+          intent: 'switch_account' as const,
+          variant: 'default' as const,
+          icon: 'sparkles' as const,
+        })),
+        {
+          label: 'Open Settings',
+          actionText: '/open settings',
+          destinationId: 'settings',
+          targetId: 'settings',
+          description: 'Manage AI accounts in Settings',
+          intent: 'open' as const,
+          variant: availableAlts.length > 0 ? ('secondary' as const) : ('default' as const),
+        },
+      ];
+
       setMessages((prev) => [
         ...prev,
         {
@@ -2569,6 +2623,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           modelUsed: activeModel.name,
           accountUsed: currentAccount.label,
           isRateLimitedNotice: true,
+          actions: cooldownActions,
+          commandOptions: cooldownActions,
         },
       ]);
       return;
@@ -2849,6 +2905,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             );
           }
 
+          const availableAlts = aiAccounts.filter(
+            (a) => a.id !== currentAccount?.id && !isAccountInCooldown(a)
+          );
+          const limitActions = [
+            ...availableAlts.slice(0, 2).map((alt) => ({
+              label: `Switch to ${alt.label}`,
+              actionText: `switch to ${alt.label}`,
+              targetId: alt.id,
+              description: `Switch active provider to ${alt.label}`,
+              intent: 'switch_account' as const,
+              variant: 'default' as const,
+              icon: 'sparkles' as const,
+            })),
+            {
+              label: 'Open Settings',
+              actionText: '/open settings',
+              destinationId: 'settings',
+              targetId: 'settings',
+              description: 'Manage AI accounts in Settings',
+              intent: 'open' as const,
+              variant: availableAlts.length > 0 ? ('secondary' as const) : ('default' as const),
+            },
+          ];
+
           setMessages((prev) => [
             ...prev,
             {
@@ -2860,6 +2940,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               modelUsed: activeModel.name,
               accountUsed: currentAccount?.label,
               isRateLimitedNotice: true,
+              actions: limitActions,
+              commandOptions: limitActions,
             },
           ]);
           setIsGeneratingResponse(false);
@@ -2867,6 +2949,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
 
         if (data?.errorType === 'MISSING_KEY') {
+          const keyActions = [
+            {
+              label: 'Open Settings',
+              actionText: '/open settings',
+              destinationId: 'settings',
+              targetId: 'settings',
+              description: 'Configure API key in Settings',
+              intent: 'open' as const,
+              variant: 'default' as const,
+            },
+          ];
           setMessages((prev) => [
             ...prev,
             {
@@ -2877,6 +2970,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
               modelUsed: activeModel.name,
               accountUsed: currentAccount?.label,
+              actions: keyActions,
+              commandOptions: keyActions,
             },
           ]);
           setIsGeneratingResponse(false);
