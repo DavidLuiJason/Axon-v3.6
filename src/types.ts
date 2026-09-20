@@ -78,6 +78,13 @@ export interface ChatCommandOption {
   category?: string;
 }
 
+/**
+ * Contextual message action representing an optional user interaction attached to a specific message.
+ * Aliases ChatCommandOption to establish the broader concept of purpose-driven contextual message actions
+ * while preserving complete backwards compatibility and ensuring execution convergence through addMessage().
+ */
+export type ContextualMessageAction = ChatCommandOption;
+
 export interface ChatMessage {
   id: string;
   sender: 'user' | 'axon';

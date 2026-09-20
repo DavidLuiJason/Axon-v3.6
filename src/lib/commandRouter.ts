@@ -39,7 +39,16 @@ export interface PendingChoiceState {
 // In-memory pending-choice state surviving between consecutive chat messages
 let activePendingChoice: PendingChoiceState | null = null;
 
+export const PENDING_CHOICE_EXPIRATION_MS = 60000;
+
 export function getPendingChoice(): PendingChoiceState | null {
+  if (
+    activePendingChoice &&
+    (typeof activePendingChoice.timestamp !== 'number' ||
+      Date.now() - activePendingChoice.timestamp >= PENDING_CHOICE_EXPIRATION_MS)
+  ) {
+    activePendingChoice = null;
+  }
   return activePendingChoice;
 }
 
